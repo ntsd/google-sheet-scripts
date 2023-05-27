@@ -3,21 +3,42 @@ var endRow = 1000;
 
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
-  ui.createMenu("Sync to Calendar")
-    .addItem("Sync events", "syncEvents")
+  ui.createMenu("Sync to Calendar (Testnet)")
+    .addItem("Sync events", "syncEventsTestnet")
     .addSeparator()
     .addSubMenu(
       ui
         .createMenu("Delete")
-        .addItem("Clear removed events", "clearRemovedEvents")
+        .addItem("Clear removed events", "clearRemovedEventsTestnet")
+    )
+    .addToUi();
+  ui.createMenu("Sync to Calendar (Mainnet)")
+    .addItem("Sync events", "syncEventsMainnet")
+    .addSeparator()
+    .addSubMenu(
+      ui
+        .createMenu("Delete")
+        .addItem("Clear removed events", "clearRemovedEventsMainnet")
     )
     .addToUi();
 }
 
-function syncEvents() {
+function syncEventsMainnet() {
+  syncCalendar(true);
+}
+
+function syncEventsTestnet() {
+  syncCalendar(false);
+}
+
+function syncCalendar(isMainNet) {
+  var checkEnvironment = isMainNet ? "Mainnet" : "Testnet";
+
   var spreadsheet = SpreadsheetApp.getActiveSheet();
 
-  var calendarId = spreadsheet.getRange("H5").getValue();
+  var calendarId = isMainNet
+    ? spreadsheet.getRange("D5").getValue()
+    : spreadsheet.getRange("H5").getValue();
   var eventCal = CalendarApp.getCalendarById(calendarId);
 
   var targetRange = spreadsheet.getRange(`A${startRow}:I${endRow}`);
@@ -47,7 +68,13 @@ function syncEvents() {
       break;
     }
 
+    // skip finished events
     if (status !== "On-going") {
+      continue;
+    }
+
+    // check environment
+    if (environment !== checkEnvironment) {
       continue;
     }
 
@@ -90,8 +117,6 @@ function syncEvents() {
         event.setTitle(eventTitle);
         event.setDescription(eventDescription);
         event.setTime(startTimeDate, endTimeDate);
-        event.setTag("project", project);
-        event.setTag("environment", environment);
         continue;
       }
 
@@ -100,8 +125,6 @@ function syncEvents() {
         description: eventDescription,
         sendInvites: true,
       });
-      event.setTag("project", project);
-      event.setTag("environment", environment);
       data[i][8] = event.getId();
     } catch (e) {
       alert(`error on project ${project} campaign ${campaign}: ${e.message}`);
@@ -112,10 +135,21 @@ function syncEvents() {
   toast("Updated Calendar");
 }
 
-function clearRemovedEvents() {
+function clearRemovedEventsTestnet() {
+  clearRemovedEvents(false);
+}
+
+function clearRemovedEventsMainnet() {
+  clearRemovedEvents(true);
+}
+
+function clearRemovedEvents(isMainNet) {
   var spreadsheet = SpreadsheetApp.getActiveSheet();
 
-  var calendarId = spreadsheet.getRange("H5").getValue();
+  var checkEnvironment = isMainNet ? "Mainnet" : "Testnet";
+  var calendarId = isMainNet
+    ? spreadsheet.getRange("D5").getValue()
+    : spreadsheet.getRange("H5").getValue();
   var eventCal = CalendarApp.getCalendarById(calendarId);
 
   var targetRange = spreadsheet.getRange(`A${startRow}:I${endRow}`);
@@ -127,6 +161,7 @@ function clearRemovedEvents() {
     var status = data[i][0];
     var project = data[i][1];
     var campaign = data[i][2];
+    var environment = data[i][5];
     var eventId = data[i][8];
 
     if (
@@ -138,6 +173,11 @@ function clearRemovedEvents() {
       campaign === ""
     ) {
       break;
+    }
+
+    // check environment
+    if (environment !== checkEnvironment) {
+      continue;
     }
 
     if (eventId !== "") {
